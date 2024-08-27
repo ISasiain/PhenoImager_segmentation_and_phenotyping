@@ -291,7 +291,7 @@ for path_to_image in paths_to_images:
         elif len(positive_markers) == 1:
 
             # Determine if FOXP3 is expressed
-            if positive_markers[0] in ["CD4", "CD8"] and pos_FOXP3:
+            if positive_markers[0] in ["CD4"] and pos_FOXP3:
                 cells_df.loc[cell, "Phenotype"] = positive_markers[0] + "_FOXP3"
             else:
                 cells_df.loc[cell, "Phenotype"] = positive_markers[0]

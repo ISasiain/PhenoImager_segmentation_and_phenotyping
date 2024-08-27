@@ -55,12 +55,12 @@ source("scripts/utils.R")
 # Defining command line argument list
 option_list <- list(
   make_option(c("-i", "--input_file"), type="character", help="Path to the input file whose phenotyping is intended to be refined"),
-  make_option(c("-o", "--output_path"), type="character", default=".", help="Path to the path to generate output file"),
+  make_option(c("-o", "--output_path"), type="character", default=".", help="Path to generate output file"),
   make_option(c("-d", "--dapi_threshold"), type="double", default=1.9, help="Threshold of DAPI intensity to be used to identify folds in the image"),
   make_option(c("-s", "--size_threshold"), type="double", default=600.0, help="Threshold of nuxlear size to remove segmentation errors"),
   make_option(c("-t", "--tumour_marker"), type="character", default="PAN.CK", help="Name of the tumour marker"),
   make_option(c("-p", "--tumour_phenotype"), type="character", default="PAN-CK", help="Name of the tumour phenotype generated in the threshold based clustering"),
-  make_option(c("-e", "--expected_phenotypes_and_markers"), type="character", default = "/Users/isasiain/PhD/Projects/immune_spatial/custom_phenotyping/data/expected_phenotypes_and_markers.tsv", help="Data frame with the combination of markers in the expected phenotypes. Phenotypes as rows and markers as columns.")
+  make_option(c("-e", "--expected_phenotypes_and_markers"), type="character", default = "/Users/isasiain/PhD/Projects/immune_spatial/PhenoImager_automatic_phenotyping/data/expected_phenotypes_and_markers.tsv", help="Data frame with the combination of markers in the expected phenotypes. Phenotypes as rows and markers as columns.")
 )
 
 
@@ -89,14 +89,21 @@ intensities_file <- intensities_file[dapi_filter & size_filter, ]
 # REFINING PHENOTYPING: TUMOUR VS STROMA
 #
 
+# Getting_data
+to_cluster <- intensities_file[, c("Nuclear_area", args$"tumour_marker", "Phenotype")]
+
+# Perform winsorization and archsinh(x/5) transformation of pan-ck intensities
+to_cluster[, args$"tumour_marker"] <- arcsinh_x(winsorize(to_cluster[, args$"tumour_marker"])/5)
+
+
 # Run Gaussian mixture modelling for two groups setting initial centroid parameters based on thresholding based phenotyping
-my_model <- mvnormalmixEM(x = intensities_file[, c("Nuclear_area", args$"tumour_marker")],
-                          lambda = c(nrow(intensities_file[intensities_file$Phenotype == "PAN-CK",]) / nrow(intensities_file),
-                                     nrow(intensities_file[intensities_file$Phenotype != "PAN-CK",]) / nrow(intensities_file)),
-                          sigma = list(cov(intensities_file[intensities_file$Phenotype == "PAN-CK", c("Nuclear_area", args$"tumour_marker")]),
-                                       cov(intensities_file[intensities_file$Phenotype != "PAN-CK", c("Nuclear_area", args$"tumour_marker")])),
-                          mu = list(colMeans(intensities_file[intensities_file$Phenotype == "PAN-CK", c("Nuclear_area", args$"tumour_marker")]),
-                                    colMeans(intensities_file[intensities_file$Phenotype != "PAN-CK", c("Nuclear_area", args$"tumour_marker")]))
+my_model <- mvnormalmixEM(x = to_cluster,
+                          lambda = c(nrow(to_cluster[to_cluster$Phenotype == "PAN-CK",]) / nrow(to_cluster),
+                                     nrow(to_cluster[to_cluster$Phenotype != "PAN-CK",]) / nrow(to_cluster)),
+                          sigma = list(cov(to_cluster[to_cluster$Phenotype == "PAN-CK", c("Nuclear_area", args$"tumour_marker")]),
+                                       cov(to_cluster[to_cluster$Phenotype != "PAN-CK", c("Nuclear_area", args$"tumour_marker")])),
+                          mu = list(colMeans(to_cluster[to_cluster$Phenotype == "PAN-CK", c("Nuclear_area", args$"tumour_marker")]),
+                                    colMeans(to_cluster[to_cluster$Phenotype != "PAN-CK", c("Nuclear_area", args$"tumour_marker")]))
 )
 
 # Getting clusters based on posterior probabilities
